@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lista de Compras</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Lista de Compras</h1>
+
+  <div class="container">
+    <div class="column">
+      <h2>Itens para comprar</h2>
+      <ul id="itemsList" class="item-list"></ul>
+    </div>
+    <div class="column">
+      <h2>Itens Comprados</h2>
+      <ul id="selectedItemsList" class="item-list"></ul>
+    </div>
+  </div>
+
+  <button id="resetButton" class="reset-button">Limpar Seleção</button>
+
+  <script>
+    const itemsList = document.getElementById('itemsList');
+    const selectedItemsList = document.getElementById('selectedItemsList');
+    const eventSource = new EventSource('/sse');
+
+    eventSource.onmessage = function(event) {
+      const data = JSON.parse(event.data);
+      updateItemsList(data.items);
+    };
+
+    function updateItemsList(items) {
+      items.forEach(item => {
+        const existingItem = document.querySelector(`#${item}`);
+        if (!existingItem) {
+          let li = document.createElement('li');
+          let checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.id = item;
+          checkbox.name = 'item';
+          checkbox.value = item;
+
+          checkbox.addEventListener('change', function(event) {
+            const item = event.target.value;
+            fetch('/comprar', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: `item=${encodeURIComponent(item)}`,
+            });
+            updateSelectedItemsList();
+          });
+
+          let label = document.createElement('label');
+          label.setAttribute('for', item);
+          label.textContent = item;
+
+          li.appendChild(checkbox);
+          li.appendChild(label);
+          itemsList.appendChild(li);
+        }
+      });
+    }
+
+    function updateSelectedItemsList() {
+      selectedItemsList.innerHTML = '';
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+      checkboxes.forEach(checkbox => {
+        let li = document.createElement('li');
+        li.textContent = checkbox.value;
+        selectedItemsList.appendChild(li);
+      });
+    }
+
+    document.getElementById('resetButton').addEventListener('click', function() {
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+      });
+      updateSelectedItemsList();
+    });
+
+    fetch('/items')
+      .then(response => response.json())
+      .then(data => {
+        updateItemsList(data.items);
+      });
+  </script>
+</body>
+</html>
